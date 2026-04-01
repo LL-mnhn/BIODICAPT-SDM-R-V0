@@ -27,7 +27,15 @@ This repository is structured as follows:
 
 ## Usage
 
-Run `git clone {name_of_git_folder}` in your terminal to clone this repository.
+### Get repository on your machine
+Run `git clone https://github.com/LL-mnhn/BIODICAPT-SDM-R-V0.git` in your 
+terminal to clone this repository.
+
+### Scripts
+In R, run :
+
+- `0-import_datasets.R`: to fetch/get instructions to manually download datasets
+
 
 ## Contact
 
