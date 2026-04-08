@@ -3,6 +3,7 @@
 .Rhistory
 .RData
 .Ruserdata
+.Rprofile
 
 # Large data files 
 resources/raw_data/*
@@ -11,3 +12,8 @@ resources/preprocessed_data/*
 # add empty folders for harmonization
 !resources/raw_data/.gitkeep
 !resources/preprocessed_data/.gitkeep
+
+# others
+*.html
+Renv-tuto.md
+test.R

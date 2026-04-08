@@ -29,7 +29,7 @@ In particular, we need to have our observation data distributed into an evenly s
 We use data from Meteo France, available on [data.gouv.fr](www.data.gouv.fr/datasets/donnees-climatologiques-de-base-mensuelles). It contains point that are scattered, unevenly on the map of France. To get a grid from this dataset, we use linear interpolation, similarly to [Philips et al. (2006)](https://linkinghub.elsevier.com/retrieve/pii/S030438000500267X) (to cite them: it is "likely more realistic than simply using nearest-neighbor interpolation").
 
 BIODICAPT is considering the use of "SAFRAN" data : simulation made by meteo-france, instead of just using observation data. IMO, the [CHELSA](https://www.chelsa-climate.org/) dataset is also interesting and should be considered.
-x
+
 #### Land Cover
 France's governement has several public programs aiming at categorizing land usage, the most used ones are :
 - [OCS GE (Land Cover at large scale)](https://www.data.gouv.fr/datasets/ocs-ge)
