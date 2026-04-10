@@ -51,8 +51,8 @@ In R, run :
 
 
 ## TODO
-- []: make an compare OEDs
-- []: hide critical parameters in .json file (not urgent)
+- [] Make and compare thoretical OEDs
+- [] Hide critical parameters in .json file (not urgent)
 
 
 ## Contact

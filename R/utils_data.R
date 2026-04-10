@@ -11,7 +11,8 @@ library(sf)
 
 
 ##### Parameters #####
-# extent of raster around France (hard coded so that they can't be changed)
+# DO NOT MODIFY
+# Extent of raster around France with some space around
 LON_MIN <- -5
 LON_MAX <- 9.55
 LAT_MIN <- 41.35
@@ -483,6 +484,85 @@ simplify_CLC <- function(
     terra::coltab(clc_raster_aug) <- coltab 
     
     return(clc_raster_aug)
+}
+
+#' Group together the selected categories of a raster
+#'
+#' Reduces the number of categories in a raster by grouping together the 
+#' categories specified by the user. Conserves original colors.
+#'
+#' @param raster A basic SpatRaster object. Must have values & land_cover fields
+#' @param cats_2_group A list of categories to group together (must be a sample of `terra::cats(raster)[[1]]$land_cover`)
+#' @param new_group_name A string. Self-explanatory.
+#' @param new_group_color A string. Self-explanatory. See `help(col2rgb)` for accepted formats.
+#' 
+#' @return The raster with its new categories.
+#'
+#' @export
+group_CLC_categories <- function(
+        raster,
+        cats_2_group,
+        new_group_name = "unmodelled",
+        new_group_color = "#000000"
+){
+    ### 1. Grouping labels to discard together
+    # 1.1. get table of categories in raster
+    cat_table <- terra::cats(raster)[[1]]
+    
+    # 1.2. recode each old label to a new one
+    recode_map <- ifelse(
+        cat_table$land_cover %in% cats_2_group,
+        new_group_name,
+        cat_table$land_cover
+    )
+    cat_table$NEW_LABEL <- recode_map
+    
+    # 1.3. Assign new values
+    new_label_groups <- unique(cat_table$NEW_LABEL)
+    new_values <- setNames(seq_along(new_label_groups), new_label_groups)
+    cat_table$NEW_VALUE <- new_values[cat_table$NEW_LABEL]
+    
+    # 1.4. Reclassification of the raster
+    rcl_matrix <- as.matrix(cat_table[, c("value", "NEW_VALUE")])
+    r_reclass <- terra::classify(raster, rcl_matrix)
+    
+    # 1.5. Attach the new category labels
+    new_cat_table <- data.frame(
+        value = unname(new_values),
+        land_cover = names(new_values)
+    )
+    base::levels(r_reclass) <- new_cat_table
+    
+    # 2. Remake color table (lost when using classify())
+    # 2.1. get initial color table
+    orig_colors <- terra::coltab(raster)[[1]]  
+    
+    # 2.2. Categories with unchanged LABEL keep the same colors
+    cats_with_same_labels <- cat_table[!cat_table$NEW_LABEL %in% c(new_group_name), ]
+    values_of_cats_with_same_labels <- cats_with_same_labels[!duplicated(cats_with_same_labels$NEW_VALUE), c("value", "NEW_VALUE")]
+    colors_of_cats_with_same_labels <- terra::merge(values_of_cats_with_same_labels, orig_colors, by = "value")
+    colors_of_cats_with_same_labels$value <- colors_of_cats_with_same_labels$NEW_VALUE  # replace old ID with new ID
+    
+    # remove NEW_VALUE column
+    colors_of_cats_with_same_labels$NEW_VALUE <- NULL 
+    
+    # 2.3. Add a new color row for the new group (here: grey, feel free to change)
+    rgb_vals <- col2rgb(new_group_color)
+    new_group_row <- data.frame(
+        value = unname(new_values[new_group_name]),
+        red = as.integer(rgb_vals["red",   1]),
+        green = as.integer(rgb_vals["green", 1]),
+        blue = as.integer(rgb_vals["blue",  1]),
+        alpha = 255L
+    )
+    
+    # 2.4. Combine and sort by value
+    new_colors <- rbind(colors_of_cats_with_same_labels, new_group_row)
+    new_colors  <- new_colors[order(new_colors$value), ]
+    
+    terra::coltab(r_reclass) <- new_colors
+    
+    return(r_reclass)
 }
 
 

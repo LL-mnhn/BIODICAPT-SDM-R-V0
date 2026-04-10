@@ -13,8 +13,8 @@ For this theoretical model of species distribution, we'll start with a very simp
 $$
 \begin{align}
 y_i &\sim \text{Bernoulli}(\theta_i) \\
-\text{logit}(\theta_i) &= \beta_{0j} + \beta_1 \tilde{T_i} \\
-\beta_{0j}, \beta_1 &\sim \text{Normale}(0, 1.5) \\
+\text{logit}(\theta_i) &= \beta_{j} + \beta_1 \tilde{T_i} \\
+\beta_{j}, \beta_1 &\sim \text{Normale}(0, 1.5) \\
 \end{align}
 $$
 

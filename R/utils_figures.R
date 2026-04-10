@@ -10,7 +10,13 @@ source(here::here("R/utils_data.R"))
 
 
 ##### Parameters #####
-# empty for now...
+# Zoom to metropolitan France
+MAP_DISPLAY_LIMITS = c(
+    xmin = -5,
+    xmax = 10,
+    ymin = 41,
+    ymax = 51
+)
 
 
 ##### Functions #####
@@ -30,7 +36,6 @@ ggplot_get_france_base_map <- function(borders_type="national"){
     base_map <- ggplot2::ggplot(europe_shp) +
         ggplot2::geom_sf(fill = "grey80", color = "white") +                     # color of countries
         ggplot2::geom_sf(data = france_shp, fill = "white", color = "black") +   # color of France
-        ggplot2::coord_sf(xlim = c(-5, 10), ylim = c(41, 51)) +  # Zoom to metropolitan France
         ggplot2::theme_minimal() +
         ggplot2::theme(
             panel.background = ggplot2::element_rect(fill = "lightcyan1", color = NA),
@@ -40,15 +45,15 @@ ggplot_get_france_base_map <- function(borders_type="national"){
         ggplot2::labs(
             x = "longitude",
             y = "latitude"
-        )
+        ) +
+        ggplot2::coord_sf(
+            xlim = c(MAP_DISPLAY_LIMITS[1], MAP_DISPLAY_LIMITS[2]), 
+            ylim = c(MAP_DISPLAY_LIMITS[3], MAP_DISPLAY_LIMITS[4]))
     
     return(base_map)
 }
 
-#' Create a ggplot that shows weather stations locations
-#'
-#' Creates a ggplot that shows weather stations locations 
-#' on a basic map of France
+#' Create a ggplot that shows the locations of CSV rows
 #'
 #' @param base_map A base ggplot on which to draw the stations locations (usually, obtained from \code{\link{ggplot_get_france_base_map}})
 #' @param csv_path A string that is the path to a CSV with LON and LAT columns (CRS 4326).
@@ -58,7 +63,7 @@ ggplot_get_france_base_map <- function(borders_type="national"){
 #' @seealso \code{\link{ggplot_get_france_base_map}}
 #'
 #' @export
-ggplot_points_scattered_on_france_map <- function(base_map, csv_path){
+ggplot_CSV_points_scattered_on_france_map <- function(base_map, csv_path){
     # import csv file
     df <- data.table::fread(csv_path)
     
@@ -67,16 +72,60 @@ ggplot_points_scattered_on_france_map <- function(base_map, csv_path){
     
     # show plot with station locations
     map_data <- base_map +
-        ggplot2::geom_sf(data = data, color = "darkorange1", size = 1) +   
-        ggplot2::coord_sf(xlim = c(-5, 10), ylim = c(41, 51))
+        ggplot2::geom_sf(
+            data = data,
+            size = 1,
+            shape = 21,        
+            fill = "darkgoldenrod1", 
+            color = "darkorange1",    
+            stroke = 0.8) +   
+        ggplot2::coord_sf(
+            xlim = c(MAP_DISPLAY_LIMITS[1], MAP_DISPLAY_LIMITS[2]), 
+            ylim = c(MAP_DISPLAY_LIMITS[3], MAP_DISPLAY_LIMITS[4]))
 
+    return(map_data)
+}
+
+#' Create a ggplot that shows weather stations locations
+#'
+#' @param base_map A base ggplot on which to draw the stations locations (usually, obtained from \code{\link{ggplot_get_france_base_map}})
+#' @param df A data.frame with columns LON and LAT corresponding to coordinates in CRS:4326
+#' @param LON A string, the name of a column in df (Longitude coordinate)
+#' @param LAT A string, the name of a column in df (Latitude coordinate)
+#'
+#' @return A ggplot object
+#'
+#' @seealso \code{\link{ggplot_get_france_base_map}}
+#'
+#' @export
+ggplot_xy_points_scattered_on_france_map <- function(
+        base_map, 
+        df, 
+        LON = "x", 
+        LAT = "y"){
+    # make sure that coordinates are in the right coordinates system
+    data <- sf::st_as_sf(df, coords = c(LON, LAT), crs = 4326)
+    
+    # show plot with station locations
+    map_data <- base_map +
+        ggplot2::geom_sf(
+            data = data,
+            size = 1,
+            shape = 21,        
+            fill = "darkgoldenrod1", 
+            color = "darkorange1",    
+            stroke = 0.8) +   
+        ggplot2::coord_sf(
+            xlim = c(MAP_DISPLAY_LIMITS[1], MAP_DISPLAY_LIMITS[2]), 
+            ylim = c(MAP_DISPLAY_LIMITS[3], MAP_DISPLAY_LIMITS[4]))
+    
     return(map_data)
 }
 
 #' Create a ggplot that shows a grid of continuous values on the map of France
 #'
 #' @param base_map A base ggplot on which to draw the grid (usually, obtained from \code{\link{ggplot_get_france_base_map}})
-#' @param raster_path A string that is the path to a raster (.tif) file.
+#' @param raster Either a string (path to a raster .tif file) or a SpatRaster object.
 #' @param limits Value limits for the color bars. Can either be NULL (auto limits by steps of 5) or a list of 2 values (c(min, max)).
 #' @param colname Name of the column for which the values will be plotted.
 #' @param unit Name of the unit for colname.
@@ -88,13 +137,18 @@ ggplot_points_scattered_on_france_map <- function(base_map, csv_path){
 #' @export
 ggplot_quantitative_raster_on_france_map <- function(
         base_map, 
-        raster_path,
+        raster,
         colname,
         unit="°C",
         limits=NULL){
-    # convert to dataframe for ggplot2
-    raw_raster <- terra::rast(raster_path)
-    raw_df <- as.data.frame(raw_raster, xy = TRUE)
+    if (class(raster) == "character") {
+        # convert to dataframe for ggplot2
+        raster <- terra::rast(raster)  
+    } else if (class(raster) != "SpatRaster") {
+        stop(paste("Was expecting a string or SpatRaster object, got", class(raster)))
+    }
+
+    raw_df <- as.data.frame(raster, xy = TRUE)
     
     if (is.vector(limits) && length(limits) == 2){
         low_limit <- limits[1]
@@ -111,13 +165,16 @@ ggplot_quantitative_raster_on_france_map <- function(
         ggplot2::geom_raster(data = raw_df, aes(x = x, y = y, fill = .data[[colname]])) +
         ggplot2::scale_fill_continuous(
             na.value = "transparent", 
-            palette = "plasma",
+            palette = "turbo",
             limits = c(low=low_limit, high=high_limit)) +
         ggplot2::labs(
             x = "longitude",
             y = "latitude",
             fill = unit
-        )
+        ) +
+        ggplot2::coord_sf(
+            xlim = c(MAP_DISPLAY_LIMITS[1], MAP_DISPLAY_LIMITS[2]), 
+            ylim = c(MAP_DISPLAY_LIMITS[3], MAP_DISPLAY_LIMITS[4]))
     
     return(map_temperature_grid)
 }
@@ -125,7 +182,7 @@ ggplot_quantitative_raster_on_france_map <- function(
 #' Create a ggplot that shows a grid of categorical values on the map of France
 #'
 #' @param base_map A base ggplot on which to draw the grid (usually, obtained from \code{\link{ggplot_get_france_base_map}})
-#' @param raster_path A string that is the path to a raster (.tif) file.
+#' @param raster Either a string (path to a raster .tif file) or a SpatRaster object.
 #' @param layer_name String that corresponds to the name of the layer to plot.
 #'
 #' @return A ggplot object
@@ -135,11 +192,15 @@ ggplot_quantitative_raster_on_france_map <- function(
 #' @export
 ggplot_categorical_raster_on_france_map <- function(
         base_map, 
-        raster_path, 
+        raster, 
         layer_name) {
     
-    # Get raster data
-    raster <- terra::rast(raster_path)
+    if (class(raster) == "character") {
+        # get raster data
+        raster <- terra::rast(raster)  
+    } else if (class(raster) != "SpatRaster") {
+        stop(paste("Was expecting a string or SpatRaster object, got", class(raster)))
+    }
         
     # Convert to dataframe for ggplot2
     df <- as.data.frame(raster, xy = TRUE) 
@@ -170,10 +231,71 @@ ggplot_categorical_raster_on_france_map <- function(
         ggplot2::labs(
             x = "longitude", 
             y = "latitude", 
-            fill = "Land Cover")
+            fill = "Land Cover") +
+        ggplot2::coord_sf(
+            xlim = c(MAP_DISPLAY_LIMITS[1], MAP_DISPLAY_LIMITS[2]), 
+            ylim = c(MAP_DISPLAY_LIMITS[3], MAP_DISPLAY_LIMITS[4]))
     
     return(map_category_grid)
 }
+
+
+#' Create a ggplot that shows presence/absence observation data on a map
+#'
+#' @param base_map A base ggplot on which to draw the grid (usually, obtained from \code{\link{ggplot_get_france_base_map}})
+#' @param df A data.frame with columns LON and LAT corresponding to coordinates in CRS:4326
+#' @param LON A string, the name of a column in df (Longitude coordinate)
+#' @param LAT A string, the name of a column in df (Latitude coordinate)
+#' @param column A string, name of the column where the observations are stored (values must be binary c(0, 1)).
+#'
+#' @return A ggplot object
+#'
+#' @seealso \code{\link{ggplot_get_france_base_map}}
+#'
+#' @export
+ggplot_categorical_raster_on_france_map <- function(
+        base_map, 
+        df, 
+        LON = "x",
+        LAT = "y",
+        column="observation") {
+    
+    # make sure that coordinates are in the right coordinates system
+    data <- sf::st_as_sf(df, coords = c(LON, LAT), crs = 4326)
+    
+    # make plot
+    map_obs <- base_map +
+        ggplot2::geom_sf(
+            data = data,
+            size = 2,
+            stroke = 0.8,
+            aes(
+                color = .data[[column]],
+                shape = .data[[column]]
+            )
+        ) +
+        ggplot2::scale_color_manual(
+            values = c("0" = "#E74C3C", "1" = "#3498DB"),
+            labels = c("Species not observed", "Species observed")
+        ) +
+        ggplot2::scale_shape_manual(
+            values = c("0" = 4, "1" = 15),  # 21 = circle, 24 = triangle
+            labels = c("Species not observed", "Species observed")
+        ) +
+        ggplot2::labs(
+            x = "longitude",
+            y = "latitude",
+            color = "Sampling location",
+            shape = "Sampling location"
+        ) +
+        ggplot2::coord_sf(
+            xlim = c(MAP_DISPLAY_LIMITS[1], MAP_DISPLAY_LIMITS[2]),
+            ylim = c(MAP_DISPLAY_LIMITS[3], MAP_DISPLAY_LIMITS[4])
+        )
+    
+    return(map_obs)
+}
+
 
 #' Save a ggplot and its legend separately
 #'

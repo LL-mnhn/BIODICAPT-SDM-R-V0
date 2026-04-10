@@ -2,16 +2,11 @@
 library(data.table)
 
 source(here::here("R/utils_data.R"))
-
+source(here::here("resources/config.R")) # Import global parameters
 
 ##### Parameters #####
-OBS_YEAR <- "2018"
-OBS_COL <- "TM" # Average temperature
-RES_KM <- 10
+### CAN BE MODIFIED
 VERBOSE <- TRUE
-
-RAW_DATA_PATH <- file.path("resources", "raw_data")
-PROCESSED_DATA_PATH <- file.path("resources", "preprocessed_data")
 
 
 ##### Main Loop #####
@@ -35,7 +30,7 @@ if (sys.nframe() == 0) {
         ) 
     
         # Save for future reference
-        fwrite(
+        data.table::fwrite(
             full_meteo_df, 
             file.path(RAW_DATA_PATH, paste0("meteo_france_", OBS_YEAR, ".csv"))
         )
@@ -55,7 +50,7 @@ if (sys.nframe() == 0) {
         filter(!is.na(TX), !is.na(TN), !is.na(TM))
     
     # Save preprocessed dataframe
-    fwrite(
+    data.table::fwrite(
         obs_year_clean_weather_df, 
         file.path(PROCESSED_DATA_PATH, paste0("meteo_france_", OBS_YEAR, "_annual_means.csv"))
     )
@@ -107,7 +102,7 @@ if (sys.nframe() == 0) {
     # Save final raster
     writeRaster(
         CHELSA_annual_raster, 
-        file.path(PROCESSED_DATA_PATH, paste0("CHELSA_Celsius_ST_", OBS_YEAR, "_res", RES_KM, ".tif")), 
+        file.path(PROCESSED_DATA_PATH, paste0("CHELSA_Celsius_AAT_", OBS_YEAR, "_res", RES_KM, ".tif")), 
         overwrite = TRUE)
     if (VERBOSE) {
         cat("CHELSA data is ready.\n\n")
