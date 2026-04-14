@@ -7,6 +7,20 @@ source(here::here("resources/config.R")) # Import global parameters
 ##### Parameters #####
 ### CAN BE MODIFIED
 VERBOSE <- TRUE
+PATH_FOLDER_RAW_XLSX <- file.path(".", "resources", "raw_data", "reseaux")
+NAMES_SAMPLES_XLSX <- c(
+    "BIODICAPT_parcelles_MONTPELLIER.xlsx",
+    "Preselection_Parcelles_BIODICAPT_SCARABEE.xlsx",
+    "Preselection_Parcelles_BIODICAPT_DYNAFOR.xlsx",
+    "Preselection_Parcelles_BIODICAPT_VCG.xlsx",
+    "Preselection_Parcelles_BIODICAPT_ZAAR.xlsx"
+)
+
+### DO NOT MODIFY
+XLSX_FILEPATHS <- c()
+for (i in 1:length(NAMES_SAMPLES_XLSX)){
+    XLSX_FILEPATHS[i] <- file.path(PATH_FOLDER_RAW_XLSX, NAMES_SAMPLES_XLSX[i])
+}
 
 
 ##### Main Loop #####
@@ -15,7 +29,27 @@ if (sys.nframe() == 0) {
     # Anw, this 'if' means the following instructions will run only when 
     # this script is the top-level call
     
-    ##### Meteo France (weather) dataset ####
+    ##### Import of XLSX surveys on locations sampled in research network #####
+    if (VERBOSE) {
+        cat("Loading and formatting BIODICAPT surveys...\n")
+    }
+    xlsx_df <- import_biodicapt_land_surveys(XLSX_FILEPATHS)
+    
+    # remove unrelevant columns
+    xlsx_df[ ,c("code_local", "Contact_Viti", "Referent_Projet", "Lot", "ocsol2026",
+                "IFT total", "IFT_data_year", "lineaire(m)_haies_buffer_1km",
+                "%surface_haies_buffer_1km", "%surface_ESN", "...11", "...12"
+    )] <- list(NULL)
+    data.table::fwrite(
+        xlsx_df, 
+        file.path(PROCESSED_DATA_PATH_CSV, "BIODICAPT_survey_data.csv")
+    )
+    if (VERBOSE) {
+        cat("BIODICAPT survey data is ready.\n\n")
+    }
+    
+    
+    ##### Meteo France (weather) dataset #####
     # Import and save raw dataset on first use only
     if (!file.exists(file.path(RAW_DATA_PATH, paste0("meteo_france_", OBS_YEAR, ".csv")))){
         if (VERBOSE) {
@@ -52,7 +86,7 @@ if (sys.nframe() == 0) {
     # Save preprocessed dataframe
     data.table::fwrite(
         obs_year_clean_weather_df, 
-        file.path(PROCESSED_DATA_PATH, paste0("meteo_france_", OBS_YEAR, "_annual_means.csv"))
+        file.path(PROCESSED_DATA_PATH_CSV, paste0("meteo_france_", OBS_YEAR, "_annual_means.csv"))
     )
     if (VERBOSE) {
         cat("Meteo France data is ready.\n\n")
@@ -61,12 +95,12 @@ if (sys.nframe() == 0) {
     
     ### Make grid from Meteo France Dataset ###
     obs_year_clean_weather_raster <- scattered_points_2_grid_on_france(
-        file.path(PROCESSED_DATA_PATH, paste0("meteo_france_", OBS_YEAR, "_annual_means.csv")), 
+        file.path(PROCESSED_DATA_PATH_RASTER, paste0("meteo_france_", OBS_YEAR, "_annual_means.csv")), 
         res_km = RES_KM, 
         colname = "TM")
     writeRaster(
         obs_year_clean_weather_raster, 
-        file.path(PROCESSED_DATA_PATH, paste0("meteo_france_", OBS_YEAR, "_res", RES_KM, "_annual_means.tif")),
+        file.path(PROCESSED_DATA_PATH_RASTER, paste0("meteo_france_", OBS_YEAR, "_res", RES_KM, "_annual_means.tif")),
         overwrite = TRUE)
         
     
@@ -102,14 +136,14 @@ if (sys.nframe() == 0) {
     # Save final raster
     writeRaster(
         CHELSA_annual_raster, 
-        file.path(PROCESSED_DATA_PATH, paste0("CHELSA_Celsius_AAT_", OBS_YEAR, "_res", RES_KM, ".tif")), 
+        file.path(PROCESSED_DATA_PATH_RASTER, paste0("CHELSA_Celsius_AAT_", OBS_YEAR, "_res", RES_KM, ".tif")), 
         overwrite = TRUE)
     if (VERBOSE) {
         cat("CHELSA data is ready.\n\n")
     }
     
     
-    ##### CORINE Land Cover 2018 Dataset ####
+    ##### CORINE Land Cover 2018 Dataset #####
     if (VERBOSE) {
         cat("Loading CORINE Land Cover data from local folder...\n")
     }
@@ -125,7 +159,7 @@ if (sys.nframe() == 0) {
         )
         writeRaster(
             corine_raster_new_res, 
-            file.path(PROCESSED_DATA_PATH, paste0("CLC2018_WGS84_custom_france_res", RES_KM, ".tif")), 
+            file.path(PROCESSED_DATA_PATH_RASTER, paste0("CLC2018_WGS84_custom_france_res", RES_KM, ".tif")), 
             overwrite = TRUE)
         
         
@@ -142,7 +176,7 @@ if (sys.nframe() == 0) {
         )
         writeRaster(
             corine_raster_simple, 
-            file.path(PROCESSED_DATA_PATH, paste0("CLC2018_WGS84_custom_france_res", RES_KM, "_simplified.tif")), 
+            file.path(PROCESSED_DATA_PATH_RASTER, paste0("CLC2018_WGS84_custom_france_res", RES_KM, "_simplified.tif")), 
             overwrite = TRUE)
         
         

@@ -8,7 +8,8 @@
 
 ### Paths
 RAW_DATA_PATH <- file.path("resources", "raw_data")
-PROCESSED_DATA_PATH <- file.path("resources", "preprocessed_data")
+PROCESSED_DATA_PATH_RASTER <- file.path("resources", "preprocessed_data", "rasters")
+PROCESSED_DATA_PATH_CSV <- file.path("resources", "preprocessed_data", "CSVs")
 FIGURES_PATH <- file.path("outputs", "figures")
 SIMULATION_PATH <- file.path("outputs", "simulation")
 

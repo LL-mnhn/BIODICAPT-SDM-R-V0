@@ -1,12 +1,13 @@
 ##### Imports #####
-library(tidyverse)
 library(data.table)
+library(tidyverse)
+library(tidyterra)
 library(jsonlite)
+library(readxl)
 library(raster)
 library(akima)
 library(purrr)
 library(terra)
-library(tidyterra)
 library(sf)
 
 
@@ -626,3 +627,56 @@ monthly_2_yearly_rasters <- function(raster_paths, res_km, fun = mean){
 }
 
 
+#' Load and format BIODICAPT surveys obtained from networks
+#'
+#' @param xlsx_paths A vector of 12 strings that are paths to raster files.
+#'
+#' @return A dataframe (a concatenation of all surveys)
+#'
+#' @export
+import_biodicapt_land_surveys <- function(xlsx_paths){
+    # Initialize list of dataframes
+    list_dfs <- list()
+    
+    # import and format each one in xlsx_paths
+    for (i in 1:length(xlsx_paths)){
+        print(xlsx_paths[i])
+        list_dfs[[i]] <- readxl::read_xlsx(
+            xlsx_paths[i],
+            sheet = if (grepl("MONTPELLIER", xlsx_paths[i], fixed = TRUE)) {1} else {2})
+        # Note : for MTP, data is in a different sheet
+        
+        if (grepl("SCARABEE", NAMES_SAMPLES_XLSX[i], fixed = TRUE)){
+            # exchange X_L93 with Y_L93 for SCARABEE
+            list_dfs[[i]][, c("LON", "LAT")] <- list_dfs[[i]][, c("Y_L93", "X_L93")]
+        } else {
+            # convert Lambert93 to WGS84 for the others
+            temp_df <- sf::st_as_sf(list_dfs[[i]], coords = c("X_L93", "Y_L93"), crs = 2154)
+            temp_df <- sf::st_transform(temp_df, crs = 4326)
+            list_dfs[[i]]$LON <- sf::st_coordinates(temp_df)[, 1]
+            list_dfs[[i]]$LAT  <- sf::st_coordinates(temp_df)[, 2]
+        }
+        
+        # Remove old GPS columns
+        list_dfs[[i]]$X_L93 <- NULL
+        list_dfs[[i]]$Y_L93 <- NULL
+        
+        # Ensure formatting
+        list_dfs[[i]]$code_local <- as.character(list_dfs[[i]]$code_local)
+        if (any(grepl("IFT total", names(list_dfs[[i]]), fixed = TRUE))){
+            list_dfs[[i]]$`IFT total` <- as.numeric(list_dfs[[i]]$`IFT total`)
+        }
+        
+        # Add column to keep track of original file
+        split_name <- strsplit(xlsx_paths[i], "_", fixed = TRUE)
+        location <- split_name[[1]][length(split_name[[1]])]
+        location <- substr(location, 1, nchar(location)-5)
+        list_dfs[[i]]$network <- rep(location, nrow(list_dfs[[i]]))
+        print(names(list_dfs[[i]]))
+        
+    }
+    
+    final_df <- dplyr::bind_rows(list_dfs)
+    print(names(final_df))
+    return(final_df)
+}

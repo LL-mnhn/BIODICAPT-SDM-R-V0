@@ -1,6 +1,7 @@
 ##### Imports #####
 library(tidyverse)
 library(tidyterra)
+library(viridisLite)
 
 source(here::here("R/utils_data.R"))
 source(here::here("R/utils_figures.R"))
@@ -57,13 +58,13 @@ new_colors = c("grey90", "#E97882", "#E6C65C", "#5B7EC9")
 # Beta_j: effect of the land cover. 
 Beta_j <- c(
     "Others" = NA,            # urban areas, water bodies, etc. are not modelled
-    "Extensive fields" = -3,
-    "Pastures" = -2,
-    "Fruit trees" = -1.5,
+    "Extensive fields" = -1,
+    "Pastures" = -0.85,
+    "Fruit trees" = -0.5,
     "Agro-natural areas" = 0
 )
 # Beta_1: effect of the temperature. 
-Beta_1 <- 0.36
+Beta_1 <- 0.2
 
 
 ##### Main Loop #####
@@ -73,8 +74,15 @@ if (sys.nframe() == 0) {
     if (VERBOSE){
         cat("Loading rasters...")    
     }
-    raster_AAT <- terra::rast(file.path(PROCESSED_DATA_PATH, paste0("CHELSA_Celsius_AAT_", OBS_YEAR, "_res", RES_KM, ".tif"))) # AAT : average annual temperature
-    raster_CLC <- terra::rast(file.path(PROCESSED_DATA_PATH, paste0("CLC2018_WGS84_custom_france_res", RES_KM, "_simplified.tif")))
+    raster_AAT <- terra::rast(file.path(
+        PROCESSED_DATA_PATH_RASTER, 
+        paste0("CHELSA_Celsius_AAT_", OBS_YEAR, "_res", RES_KM, ".tif")
+    )) # AAT : average annual temperature
+    raster_CLC <- terra::rast(file.path(
+        PROCESSED_DATA_PATH_RASTER, 
+        paste0("CLC2018_WGS84_custom_france_res", RES_KM, "_simplified.tif"))
+    )
+    
     # rename CLC layer for readability
     names(raster_CLC) <- "land_cover"
     rat <- cats(raster_CLC)[[1]]
@@ -140,35 +148,48 @@ if (sys.nframe() == 0) {
         overwrite = TRUE)
     
     
-    ##### 2. TODO : Get BIODICAPT sampling locations data #####
-    ### random for now, we'll use actual locations later.
-    # mask cells that should not be picked (NAs and "Others")
-    raster_CLC_crops_masked <- terra::deepcopy(raster_CLC_crops)
-    raster_CLC_crops_masked[is.na(raster_CLC_crops) | raster_CLC_crops == "Others"] <- NA
+    ##### 2. Get BIODICAPT sampling locations data #####
+    ### 2.0. Alternative version : randomized locations.
+    # import known locations of land crops within the research network
+    network_df <- data.table::fread(
+        file.path(PROCESSED_DATA_PATH_CSV, "BIODICAPT_survey_data.csv")
+    )
+    network_df <- sf::st_as_sf(network_df, coords = c("LON", "LAT"), crs = 4326)
     
-    # random sampling
-    sampled_cells <- terra::spatSample(
-        raster_CLC_crops_masked, 
-        size = n_samples, 
-        method = "random", 
-        as.points = TRUE,
-        na.rm = TRUE)
-    sampled_cells_df <- as.data.frame(sampled_cells, geom = "XY")
-    sampled_cells_df <- sf::st_as_sf(
-        sampled_cells_df, 
-        coords = c("x", "y"), 
-        crs = 4326)
-    if (SHOW_PLOTS){
-        plot_sampled_areas <- ggplot_xy_points_scattered_on_france_map(
-            ggplot_get_france_base_map(), 
-            sampled_cells_df)
-        print(plot_sampled_areas)
-    }
-
-    # Extract observation values (temperature) from rasters
-    extracted_AAT <- terra::extract(raster_AAT, sampled_cells_df)
-    sampled_cells_df$temperature <- extracted_AAT[, 2]
+    # extract information from rasters
+    extracted_CLC <- terra::extract(raster_CLC_crops, network_df)
+    network_df$land_cover <- extracted_CLC[, 2]
+    extracted_AAT <- terra::extract(raster_AAT, network_df)
+    network_df$temperature <- extracted_AAT[, 2]
     
+    # ### 2.0.1 Alternative version : randomized locations.
+    # # mask cells that should not be picked (NAs and "Others")
+    # raster_CLC_crops_masked <- terra::deepcopy(raster_CLC_crops)
+    # raster_CLC_crops_masked[is.na(raster_CLC_crops) | raster_CLC_crops == "Others"] <- NA
+    # 
+    # # random sampling
+    # sampled_cells <- terra::spatSample(
+    #     raster_CLC_crops_masked, 
+    #     size = n_samples, 
+    #     method = "random", 
+    #     as.points = TRUE,
+    #     na.rm = TRUE)
+    # network_df <- as.data.frame(sampled_cells, geom = "XY")
+    # network_df <- sf::st_as_sf(
+    #     network_df, 
+    #     coords = c("x", "y"), 
+    #     crs = 4326)
+    # if (SHOW_PLOTS){
+    #     plot_sampled_areas <- ggplot_xy_points_scattered_on_france_map(
+    #         ggplot_get_france_base_map(), 
+    #         network_df)
+    #     print(plot_sampled_areas)
+    # }
+    # 
+    # # Extract observation values (temperature) from rasters
+    # extracted_AAT <- terra::extract(raster_AAT, network_df)
+    # network_df$temperature <- extracted_AAT[, 2]
+    # 
 
     ##### 3. Generate observations #####
     ### 3.0. Theoretical model ###
@@ -209,7 +230,6 @@ if (sys.nframe() == 0) {
             unit = "P(presence)",
             limits = c(0,1))
         print(plot_theoretical_map)
-        
     }
     # Save simulation raster
     writeRaster(
@@ -220,24 +240,24 @@ if (sys.nframe() == 0) {
 
     ##### 3.2. Simulate presence/absence at sampled locations #####
     # Compute theta_i at each observation point
-    sampled_cells_df$theta <- stats::plogis(
-        Beta_j[as.character(sampled_cells_df$land_cover)] +
-            (Beta_1 * sampled_cells_df$temperature)
+    network_df$theta <- stats::plogis(
+        Beta_j[as.character(network_df$land_cover)] +
+            (Beta_1 * network_df$temperature)
     )
     
     # Draw Bernoulli observations
-    sampled_cells_df$species_was_observed <- as.factor(rbinom(
-        n = nrow(sampled_cells_df),
+    network_df$species_was_observed <- as.factor(rbinom(
+        n = nrow(network_df),
         size = 1,
-        prob = sampled_cells_df$theta
+        prob = network_df$theta
     ))
-    sampled_cells_df$species_was_observed  # rename items
+    network_df$species_was_observed  # rename items
     
     # Show simulated observations
     if (SHOW_PLOTS) {
-        map_obs <- ggplot_categorical_raster_on_france_map(
+        map_obs <- ggplot_categorical_df_on_france_map(
             ggplot_get_france_base_map(), 
-            sampled_cells_df, 
+            network_df, 
             column="species_was_observed"
             )
         print(map_obs)
@@ -248,47 +268,4 @@ if (sys.nframe() == 0) {
         sampled_cells_df, 
         file.path(SIMULATION_PATH, paste0("Observations_", OBS_YEAR, ".csv"))
     )
-    
-    
-    ##### 4. Fit model on observations #####
-    ### 4.1 Basic frequentist model
-    freq_model <- glm(
-        species_was_observed ~ land_cover + temperature,
-        data = sampled_cells_df,
-        family = binomial(link = "logit")
-    )
-    
-    
-    # 
-    # if (VERBOSE) {
-    #     cat("GLM fitted coefficients vs. true parameters:\n")
-    #     coef_table <- as.data.frame(summary(model_fit)$coefficients)
-    #     coef_table$true_value <- NA_real_
-    # 
-    #     # Match land-cover coefficients
-    #     for (cat_name in crop_categories) {
-    #         row_name <- paste0("land_cover", cat_name)
-    #         if (row_name %in% rownames(coef_table)) {
-    #             coef_table[row_name, "true_value"] <- Beta_j[cat_name]
-    #         }
-    #     }
-    #     coef_table["temperature", "true_value"] <- B_1
-    #     print(round(coef_table, 3))
-    #     cat("\n")
-    # }
-    # 
-    # ### 4.2. Predict occupancy probability over the full raster ###
-    # # Build a prediction grid from the CLC + AAT rasters
-    # pred_df <- as.data.frame(c(raster_CLC_crops, raster_AAT), na.rm = FALSE)
-    # colnames(pred_df) <- c("land_cover", "temperature")
-    # pred_df$land_cover <- as.character(pred_df$land_cover)
-    # 
-    # # Only predict on agricultural cells
-    # agri_mask <- !is.na(pred_df$land_cover) & pred_df$land_cover != "Others"
-    # pred_df$theta_hat <- NA_real_
-    # pred_df$theta_hat[agri_mask] <- predict(
-    #     model_fit,
-    #     newdata = pred_df[agri_mask, ],
-    #     type    = "response"
-    # )
 }

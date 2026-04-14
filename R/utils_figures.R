@@ -10,6 +10,7 @@ source(here::here("R/utils_data.R"))
 
 
 ##### Parameters #####
+# CAN BE MODIFIED
 # Zoom to metropolitan France
 MAP_DISPLAY_LIMITS = c(
     xmin = -5,
@@ -57,31 +58,54 @@ ggplot_get_france_base_map <- function(borders_type="national"){
 #'
 #' @param base_map A base ggplot on which to draw the stations locations (usually, obtained from \code{\link{ggplot_get_france_base_map}})
 #' @param csv_path A string that is the path to a CSV with LON and LAT columns (CRS 4326).
+#' @param category A string that is on of the columns in the imported CSV. Allows the user to control color and fill attributes of the points plotted on the ggplot after its generation. (Default is NULL -> use of default colors).
 #'
 #' @return A ggplot object
 #'
 #' @seealso \code{\link{ggplot_get_france_base_map}}
 #'
 #' @export
-ggplot_CSV_points_scattered_on_france_map <- function(base_map, csv_path){
+ggplot_CSV_points_scattered_on_france_map <- function(
+        base_map, 
+        csv_path,
+        category=NULL){
     # import csv file
     df <- data.table::fread(csv_path)
     
     # make sure that coordinates are in the right coordinates system
     data <- sf::st_as_sf(df, coords = c("LON", "LAT"), crs = 4326)
     
-    # show plot with station locations
-    map_data <- base_map +
-        ggplot2::geom_sf(
-            data = data,
-            size = 1,
-            shape = 21,        
-            fill = "darkgoldenrod1", 
-            color = "darkorange1",    
-            stroke = 0.8) +   
-        ggplot2::coord_sf(
-            xlim = c(MAP_DISPLAY_LIMITS[1], MAP_DISPLAY_LIMITS[2]), 
-            ylim = c(MAP_DISPLAY_LIMITS[3], MAP_DISPLAY_LIMITS[4]))
+    # shuffle to avoid biased overlaps
+    data <- dplyr::slice_sample(data, prop = 1)
+    
+    if (is.null(category)){
+        # show plot with station locations
+        map_data <- base_map +
+            ggplot2::geom_sf(
+                data = data,
+                size = 2,
+                shape = 21,        
+                fill = "darkgoldenrod1", 
+                color = "darkorange1",    
+                stroke = 0.8) +   
+            ggplot2::coord_sf(
+                xlim = c(MAP_DISPLAY_LIMITS[1], MAP_DISPLAY_LIMITS[2]), 
+                ylim = c(MAP_DISPLAY_LIMITS[3], MAP_DISPLAY_LIMITS[4]))
+    } else {
+        # leave colors options to the user
+        map_data <- base_map +
+            ggplot2::geom_sf(
+                data = data,
+                size = 2,
+                shape = 21,       
+                ggplot2::aes(
+                    fill = .data[[category]], 
+                    color = .data[[category]]),
+                stroke = 1) +   
+            ggplot2::coord_sf(
+                xlim = c(-5, 10), 
+                ylim = c(41, 51))
+    }
 
     return(map_data)
 }
@@ -106,11 +130,14 @@ ggplot_xy_points_scattered_on_france_map <- function(
     # make sure that coordinates are in the right coordinates system
     data <- sf::st_as_sf(df, coords = c(LON, LAT), crs = 4326)
     
+    # shuffle to avoid biased overlaps
+    data <- dplyr::slice_sample(data, prop = 1)
+    
     # show plot with station locations
     map_data <- base_map +
         ggplot2::geom_sf(
             data = data,
-            size = 1,
+            size = 2,
             shape = 21,        
             fill = "darkgoldenrod1", 
             color = "darkorange1",    
@@ -253,7 +280,7 @@ ggplot_categorical_raster_on_france_map <- function(
 #' @seealso \code{\link{ggplot_get_france_base_map}}
 #'
 #' @export
-ggplot_categorical_raster_on_france_map <- function(
+ggplot_categorical_df_on_france_map <- function(
         base_map, 
         df, 
         LON = "x",
@@ -262,6 +289,9 @@ ggplot_categorical_raster_on_france_map <- function(
     
     # make sure that coordinates are in the right coordinates system
     data <- sf::st_as_sf(df, coords = c(LON, LAT), crs = 4326)
+    
+    # shuffle to avoid biased overlaps
+    data <- dplyr::slice_sample(data, prop = 1)
     
     # make plot
     map_obs <- base_map +
