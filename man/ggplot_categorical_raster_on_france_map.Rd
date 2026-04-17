@@ -4,12 +4,12 @@
 \alias{ggplot_categorical_raster_on_france_map}
 \title{Create a ggplot that shows a grid of categorical values on the map of France}
 \usage{
-ggplot_categorical_raster_on_france_map(base_map, raster_path, layer_name)
+ggplot_categorical_raster_on_france_map(base_map, raster, layer_name)
 }
 \arguments{
 \item{base_map}{A base ggplot on which to draw the grid (usually, obtained from \code{\link{ggplot_get_france_base_map}})}
 
-\item{raster_path}{A string that is the path to a raster (.tif) file.}
+\item{raster}{Either a string (path to a raster .tif file) or a SpatRaster object.}
 
 \item{layer_name}{String that corresponds to the name of the layer to plot.}
 }

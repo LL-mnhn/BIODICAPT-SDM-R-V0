@@ -6,7 +6,7 @@
 \usage{
 ggplot_quantitative_raster_on_france_map(
   base_map,
-  raster_path,
+  raster,
   colname,
   unit = "°C",
   limits = NULL
@@ -15,7 +15,7 @@ ggplot_quantitative_raster_on_france_map(
 \arguments{
 \item{base_map}{A base ggplot on which to draw the grid (usually, obtained from \code{\link{ggplot_get_france_base_map}})}
 
-\item{raster_path}{A string that is the path to a raster (.tif) file.}
+\item{raster}{Either a string (path to a raster .tif file) or a SpatRaster object.}
 
 \item{colname}{Name of the column for which the values will be plotted.}
 

@@ -40,7 +40,7 @@ if (sys.nframe() == 0) {
                 "IFT total", "IFT_data_year", "lineaire(m)_haies_buffer_1km",
                 "%surface_haies_buffer_1km", "%surface_ESN", "...11", "...12"
     )] <- list(NULL)
-    data.table::fwrite(
+    fwrite(
         xlsx_df, 
         file.path(PROCESSED_DATA_PATH_CSV, "BIODICAPT_survey_data.csv")
     )
@@ -64,7 +64,7 @@ if (sys.nframe() == 0) {
         ) 
     
         # Save for future reference
-        data.table::fwrite(
+        fwrite(
             full_meteo_df, 
             file.path(RAW_DATA_PATH, paste0("meteo_france_", OBS_YEAR, ".csv"))
         )
@@ -84,7 +84,7 @@ if (sys.nframe() == 0) {
         filter(!is.na(TX), !is.na(TN), !is.na(TM))
     
     # Save preprocessed dataframe
-    data.table::fwrite(
+    fwrite(
         obs_year_clean_weather_df, 
         file.path(PROCESSED_DATA_PATH_CSV, paste0("meteo_france_", OBS_YEAR, "_annual_means.csv"))
     )

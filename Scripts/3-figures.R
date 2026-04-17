@@ -1,6 +1,8 @@
+# Figures in the other scripts are not saved, they are just needed to help
+# visualisation during simulations/modelisation.
+# This script generates, styles and saves the figures corresponding to the most
+# important steps.
 ##### Imports #####
-library(colorspace) # used to darken a color list
-
 source(here::here("R/utils_figures.R"))
 source(here::here("resources/config.R")) # Import global parameters
 
@@ -14,18 +16,12 @@ SHOW_WEATHER_STATIONS <- FALSE      # Location of meteo-france stations
 SHOW_WEATHER_INTERPOLATION <- FALSE # Temperatures interpolated from meteo-france
 SHOW_CHELSA_ST <- TRUE              # Surface temperatures from CHESLA model
 SHOW_CORINE_RASTER <- TRUE          # Land Cover
+SHOW_MODEL_DASHBOARD <- FALSE       # TODO
 
 # plots with options
 SHOW_RESEARCH_NETWORK <- TRUE
 color_column <- "network"
-colors <- c(
-    "MONTPELLIER" = "#67A300",
-    "SCARABEE" = "#00D1D1",
-    "DYNAFOR" = "#D13800",
-    "VCG" = "#C000E6",
-    "ZAAR" = "gray80"
-)
-colors_dark <- colorspace::darken(colors, amount = 0.85)
+
 
 ### DO NOT MODIFY
 set.seed(43) # For reproducible results
@@ -48,9 +44,11 @@ if (sys.nframe() == 0) {
     
     # map with locations of weather stations
     if (SHOW_WEATHER_STATIONS){
-        g1 <- ggplot_CSV_points_scattered_on_france_map(
+        g1 <- ggplot_categorical_df_on_france_map(
             base_map = empty_map_of_france,
-            csv_path = file.path(PROCESSED_DATA_PATH_CSV, paste0("meteo_france_", OBS_YEAR, "_annual_means.csv"))
+            df = file.path(PROCESSED_DATA_PATH_CSV, paste0("meteo_france_", OBS_YEAR, "_annual_means.csv")),
+            LON = "LON",
+            LAT = "LAT"
         )
         
         print(g1)
@@ -108,15 +106,14 @@ if (sys.nframe() == 0) {
     }
     # map of the research network
     if (SHOW_RESEARCH_NETWORK){
-        g5 <- ggplot_CSV_points_scattered_on_france_map(
+        g5 <- ggplot_categorical_df_on_france_map(
             base_map = empty_map_of_france,
-            csv_path = file.path(PROCESSED_DATA_PATH_CSV, "BIODICAPT_survey_data.csv"),
-            category = color_column
+            df = file.path(PROCESSED_DATA_PATH_CSV, "BIODICAPT_survey_data.csv"),
+            column = color_column,
+            LON = "LON",
+            LAT = "LAT"
         )
-        # specify colors
-        g5 <- g5 +
-            ggplot2::scale_fill_manual(values = colors) +
-            ggplot2::scale_color_manual(values = colors_dark)
+
         print(g5)
         save_figure_harmonized(
             g5,
@@ -124,4 +121,6 @@ if (sys.nframe() == 0) {
             rescale_legend = c(1.5, 1)
         )
     }
+    
+    print("TODO : add next plots to save")
 }

@@ -680,3 +680,19 @@ import_biodicapt_land_surveys <- function(xlsx_paths){
     print(names(final_df))
     return(final_df)
 }
+
+#' Compute a range and snap limits to closest multiples
+#'
+#' @param x A numeric vector.
+#' @param multiple A numeric. The multiple to which the limits will snap to.
+#'
+#' @return A vector of limits c(min, max)
+#'
+#' @export
+pretty_range <- function(x, multiple = 5) {
+    r <- range(x, na.rm = TRUE)
+    c(
+        floor(r[1] / multiple) * multiple,   # snap min DOWN to nearest multiple
+        ceiling(r[2] / multiple) * multiple  # snap max UP to nearest multiple
+    )
+}
