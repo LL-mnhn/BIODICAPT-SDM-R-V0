@@ -5,17 +5,18 @@
 .Ruserdata
 .Rprofile
 
-# Large data files 
+# Exclude large data files and irrelevant folders
 resources/raw_data/*
 resources/preprocessed_data/*
-outputs/simulation/*
 
-# add empty folders for harmonization
+# add (empty) folders back for harmonization
 !resources/raw_data/.gitkeep
 !resources/preprocessed_data/.gitkeep
-!outputs/simulation/.gitkeep
 
 # others
+*.tif
+*.tif.aux.xml
 *.html
 Renv-tuto.md
+tests
 test.R

@@ -21,6 +21,7 @@ MAP_DISPLAY_LIMITS = c(
     ymin = 41,
     ymax = 51
 )
+FONT <- "sans" # "sans" or "serif" or "mono"
 
 
 ##### Functions #####
@@ -35,7 +36,7 @@ MAP_DISPLAY_LIMITS = c(
 my_custom_ggplot_theme <- function(figure, with_palette=TRUE){
     customised_fig <- figure +
         ggplot2::theme_linedraw(
-            base_family = "Lexend"
+            base_family = FONT
         ) +
         ggplot2::theme(
             # title and subtitle styling
@@ -127,6 +128,7 @@ ggplot_get_france_base_map <- function(borders_type="national"){
     return(my_custom_ggplot_theme(base_map, with_palette=FALSE))
 }
 
+
 #' Create a ggplot that shows weather stations locations
 #'
 #' @param base_map A base ggplot on which to draw the stations locations (usually, obtained from \code{\link{ggplot_get_france_base_map}})
@@ -165,6 +167,7 @@ LEGACY_ggplot_xy_points_scattered_on_france_map <- function(
     
     return(my_custom_ggplot_theme(map_data, with_palette = FALSE))
 }
+
 
 #' Create a ggplot that shows a grid of continuous values on the map of France
 #'
@@ -208,7 +211,7 @@ ggplot_quantitative_raster_on_france_map <- function(
     map_temperature_grid <- base_map +
         ggplot2::geom_raster(
             data = raw_df, 
-            aes(x = x, y = y, fill = .data[[colname]])) +
+            ggplot2::aes(x = x, y = y, fill = .data[[colname]])) +
         ggplot2::scale_fill_continuous(
             na.value = "transparent", 
             palette = "turbo",
@@ -224,6 +227,7 @@ ggplot_quantitative_raster_on_france_map <- function(
     
     return(my_custom_ggplot_theme(map_temperature_grid, with_palette = FALSE))
 }
+
 
 #' Create a ggplot that shows a grid of categorical values on the map of France
 #'
@@ -269,7 +273,7 @@ ggplot_categorical_raster_on_france_map <- function(
     
     # make ggplot
     map_category_grid <- base_map +
-        ggplot2::geom_raster(data = df, aes(x = x, y = y, fill = .data[[layer_name]])) +
+        ggplot2::geom_raster(data = df, ggplot2::aes(x = x, y = y, fill = .data[[layer_name]])) +
         ggplot2::scale_fill_manual(
             values = label_colors,
             na.value = "transparent"
@@ -375,7 +379,7 @@ ggplot_categorical_df_on_france_map <- function(
                 ggplot2::geom_sf(
                     data = data,
                     stroke = 0.8,
-                    aes(
+                    ggplot2::aes(
                         color = .data[[column]],
                         fill = .data[[column]],
                         shape = .data[[column]],
@@ -442,12 +446,17 @@ save_figure_harmonized <- function(ggplot_obj, save_path, rescale_legend=c(4, 4)
         stop(paste("Provided save_path must end with '.pdf', got", save_path))
     }
     
+    ggplot_obj_nofont <- ggplot_obj +
+    theme(text = element_text(family = FONT),
+        legend.text = element_text(family = FONT),
+        legend.title = element_text(family = FONT))
+  
     # extract legend from original figure
-    legend <- cowplot::get_legend(ggplot_obj)
+    legend <- cowplot::get_legend(ggplot_obj_nofont)
 
     # Re-create plot (without legend)
     ggplot_obj_no_legend <- ggplot_obj + ggplot2::theme(legend.position = "none")
-
+  
     # Save separately
     ggplot2::ggsave(
         filename = save_path,
@@ -455,7 +464,8 @@ save_figure_harmonized <- function(ggplot_obj, save_path, rescale_legend=c(4, 4)
         dpi = 300,
         width = 4,
         height = 4,
-        units = "in")
+        units = "in",
+        device = cairo_pdf)
     
     if (!is.null(legend)){
         ggplot2::ggsave(
@@ -464,7 +474,8 @@ save_figure_harmonized <- function(ggplot_obj, save_path, rescale_legend=c(4, 4)
             dpi = 300,
             width = 4*rescale_legend[1],
             height = 4*rescale_legend[2],
-            units = "in")        
+            units = "in",
+            device = cairo_pdf)        
     }
 }
 
@@ -491,7 +502,7 @@ normal_density_plot_with_thresholds <- function(
     ci_lower <- mean_val - 1.96 * sd_val
     ci_upper <- mean_val + 1.96 * sd_val
     
-    graph <- ggplot(data.frame(x = boundaries), aes(x)) +
+    graph <- ggplot(data.frame(x = boundaries), ggplot2::aes(x)) +
         # Shade left tail (< 2.5%)
         stat_function(
             fun = function(x) ifelse(x < ci_lower, stats::dnorm(x, mean_val, sd_val), NA),
@@ -509,7 +520,7 @@ normal_density_plot_with_thresholds <- function(
         stat_function(
             fun = stats::dnorm, 
             args = list(mean = mean_val, sd = sd_val),
-            aes(color = "Distribution"), 
+            ggplot2::aes(color = "Distribution"), 
             linewidth = 1) +
         labs(x = "Value", y = "Density") +
         scale_color_manual(values = c("Distribution" = PALETTE[1])) +
@@ -525,7 +536,7 @@ normal_density_plot_with_thresholds <- function(
         graph <- graph +
             geom_vline(
                 data = threshold_df,
-                aes(xintercept = value, color = label),
+                ggplot2::aes(xintercept = value, color = label),
                 linewidth = 0.66,
                 linetype = "dashed"
             ) +
@@ -548,6 +559,50 @@ normal_density_plot_with_thresholds <- function(
 }
 
 
+#' Create a basic histogram with ggplots
+#'
+#' This function is a simple wrapper to make customized histograms
+#'
+#' @param df A data.frame with columns x and category.
+#' @param x A string, the name of a column to compute histograms on.
+#' @param category A string, the name of a column to color the histograms with (default is NULL, no color added).
+#' @param binwidth A numeric, controls the width of each bin (default is 1).
+#' 
+#' @export
+ggplot_bars <- function(df, x, category = NULL, binwidth = 1) {
+    if (is.null(category)) {
+        graph <- ggplot2::ggplot(
+            data = df, 
+            ggplot2::aes(x = .data[[x]])) +
+        ggplot2::geom_histogram(
+            color = darken(PALETTE[1], amount = 0.5),
+            fill = PALETTE[1],
+            binwidth = binwidth)
+        # ggplot2::geom_density(
+        #     color = darken(PALETTE[1], amount = 0.5),
+        #     fill = PALETTE[1],
+        #     alpha = 0.2)
+    } else {
+        graph <- ggplot2::ggplot(
+            data = df, 
+            ggplot2::aes(
+                x = .data[[x]], 
+                color = .data[[category]],
+                fill = .data[[category]]
+                )) +
+        ggplot2::geom_histogram(
+            binwidth = binwidth, 
+            position = "identity", 
+            alpha = 0.5)
+        # ggplot2::geom_density(
+        #     position = "identity", 
+        #     alpha = 0.2)
+    }
+
+    return(my_custom_ggplot_theme(graph, with_palette = TRUE))
+}
+
+
 #' Create a grid of density and/or scatter points
 #'
 #' @param df_points A data.frame with columns x, y and z.
@@ -557,7 +612,7 @@ normal_density_plot_with_thresholds <- function(
 #' @param category A string, the name of a column in both df, that has qualitative values.
 #'
 #' @export
-plot_grid_scattered_densities <- function(
+ggplot_grid_scattered_densities <- function(
         x, 
         y, 
         category,
@@ -588,8 +643,7 @@ plot_grid_scattered_densities <- function(
             ) +
             ggplot2::geom_line(
                 data = df_lines,
-                ggplot2::aes(x = .data[[x]], y = .data[[y]]),
-                color = "black",
+                ggplot2::aes(x = .data[[x]], y = .data[[y]], color = "Density curve"),
                 linewidth = 1
             )
     }
@@ -599,8 +653,7 @@ plot_grid_scattered_densities <- function(
         grid <- grid +
             ggplot2::geom_point(
                 data = df_points,
-                ggplot2::aes(x = .data[[x]], y = .data[[y]]),
-                color = PALETTE[1],
+                ggplot2::aes(x = .data[[x]], y = .data[[y]], color = "Points"),
                 size = 1
             )
     }
@@ -612,7 +665,201 @@ plot_grid_scattered_densities <- function(
         ggplot2::lims(
             x = range(ref_df[[x]]),
             y = c(0, 1)
+        ) +
+        ggplot2::scale_color_manual(
+            values = c("Points" = PALETTE[1], "Density curve" = "black"),
+            name = NULL  # Remove the legend title if you prefer
         )
     
-    return(my_custom_ggplot_theme(grid, with_palette = TRUE))
+    return(my_custom_ggplot_theme(grid, with_palette = FALSE))
+}
+
+
+LEGACY_ggplot_normal_distribution_VS_target_value<- function(
+        mod,
+        target_values,
+        group_name,
+        approach,
+        x_min = NULL,
+        x_max = NULL,
+        y_max = NULL,
+        precision = 500,
+        n_burnin = NULL,
+        params = NULL,
+        params_labels_for_targets = NULL,
+        suppress_warning = FALSE) {
+    
+    # Message: underlying statistical assumption necessary to use the function
+    if (!suppress_warning) {
+        warning(
+            paste0(
+                "This function ASSUMES THAT ALL PARAMETERS PLOTTED ",
+                "FOLLOW A NORMAL DISTRIBUTION. ",
+                "This is a strong assumption that may not apply to your ",
+                "specific dataset, please check your data before using ",
+                "this function."
+            )
+        )
+    } 
+    
+    # Function not entirely ready for general use yet, tell it to the user
+    if (!suppress_warning) {
+        warning(
+            paste0(
+                "This function handles models with 1 categorical variable ",
+                "and 1 quantitative variable. NOTHING ELSE FOR NOW."
+            )
+        )
+    } 
+    
+    # Extract coefficients from given model
+    if (approach == "frequentist"){
+        # Extract coefficients
+        coefs_table <- summary(mod)$coefficients
+        rownames(coefs_table) <- gsub(group_name, "", rownames(coefs_table))
+        
+        # Set up x-axis limits
+        if (is.null(x_min)) {
+            x_min = min(coefs_table[,"Estimate"]) - 2*max(coefs_table[,"Std. Error"])
+        }
+        if (is.null(x_max)) {
+            x_max = max(coefs_table[,"Estimate"]) + 2*max(coefs_table[,"Std. Error"])
+        }
+        bell_range <- seq(x_min, x_max, length.out = precision)
+        
+        # Make data table to plot
+        distribution_df <- data.frame()
+        point_value_df <- data.frame()
+        total_n <- nrow(mod$model)
+        for (name in rownames(coefs_table)) {
+            # Extract results for a specific coefficient
+            estimate <- coefs_table[name, "Estimate"]
+            se <- coefs_table[name, "Std. Error"]
+            
+            # Create distribution
+            distrib <- dnorm(bell_range, mean = estimate, sd = se * sqrt(total_n))
+            
+            temp_df <- data.frame(
+                x = bell_range,
+                y = distrib,
+                parameter = rep(name, length(bell_range))
+            )
+            distribution_df <- rbind(distribution_df, temp_df)
+            
+            # Add target values to another table
+            temp_df_bis <- data.frame(
+                x = target_values[name],
+                y = dnorm(
+                    target_values[name], 
+                    mean = estimate, 
+                    sd = se * sqrt(total_n)),
+                parameter = name
+            )
+            point_value_df <- rbind(point_value_df, temp_df_bis)
+        }
+        
+        # print one graph for each variable.
+        variables <- colnames(mod$model)[2:length(colnames(mod$model))]
+        
+        
+        
+    } else if (approach == "bayesian") {
+        # Group chains together
+        # add iteration number and chain ID
+        chain_list <- list()
+        for (i in 1:N_CHAINS) {
+            chain_df <- as.data.frame(mod[[paste0("chain", i)]])
+            chain_df$Iteration <- 1:nrow(chain_df)
+            chain_df$Chains <- paste("chain", i)
+            chain_list[[i]] <- chain_df
+        }
+        # bind chains into a single table
+        chains_combined <- dplyr::bind_rows(chain_list)
+        chains_combined <- chains_combined[c(params, "Iteration", "Chains")]
+        
+        # remove burn-in iterations
+        chains_combined <- chains_combined[(chains_combined$Iteration > n_burnin), ]
+        
+        # Convert to a dataframe acceptable by ggplot2
+        distribution_df <- data.frame()
+        point_value_df <- data.frame()
+        
+        for (name in names(target_values)) {
+            if (is.na(target_values[name])) {
+                next
+            }
+            
+            # select local data and make bins
+            local_df <- chains_combined[params_labels_for_targets[name]]
+            local_hist <- hist(
+                local_df[[1]], 
+                breaks = seq(min(local_df), max(local_df), length.out = precision), 
+                plot=FALSE)
+            
+            temp_df <- data.frame(
+                x = (local_hist$breaks[-length(local_hist$breaks)] + local_hist$breaks[-1]) / 2,
+                y = local_hist$density,
+                parameter = rep(name, length(local_hist$density))
+            )
+            distribution_df <- rbind(distribution_df, temp_df)
+            
+            # Add target values to another table
+            temp_df_bis <- data.frame(
+                x = target_values[name],
+                y = local_hist$density[which.min(abs(target_values[name]-local_hist$breaks))],
+                parameter = name
+            )
+            point_value_df <- rbind(point_value_df, temp_df_bis)
+            
+        }
+        
+        variables <- unique(gsub("\\[\\d+\\]", "", params))
+        
+    } else {
+        
+        stop(paste0(
+            "Was expecting 'approach' to be one of ",
+            "c('frequentist', 'bayesian'), got ",
+            approach
+        ))
+        
+    }
+    
+    
+    list_graphs <- list()
+    for (v in 1:length(variables)) {
+        
+        if (approach == "frequentist"){
+            # select variables to keep
+            names_to_keep <- rownames(coefs_table)[grepl(paste0("^", variables[v]), rownames(summary(mod)$coefficients))]    
+            # select columns
+            temp_distribution_df <- distribution_df[distribution_df$parameter %in% names_to_keep,]
+            temp_point_value_df <- point_value_df[point_value_df$parameter %in% names_to_keep,]
+        } else if (approach == "bayesian") {
+            # select variables to keep
+            names_to_keep <- params_labels_for_targets[grepl(paste0("^", variables[v]), params_labels_for_targets)]
+            # select columns
+            temp_distribution_df <- distribution_df[distribution_df$parameter %in% names(names_to_keep),]
+            temp_point_value_df <- point_value_df[point_value_df$parameter %in% names(names_to_keep),]
+        }
+        
+        # make plot with these variables
+        list_graphs[[v]] <- plot_grid_scattered_densities(
+            df_lines = temp_distribution_df,
+            df_points = temp_point_value_df,
+            x="x",
+            y="y",
+            category="parameter") +
+            ggplot2::lims(
+                y = c(0, ifelse(is.null(y_max), max(temp_distribution_df[, "y"]), 1))
+            ) +
+            ggplot2::labs(
+                title = paste("Distribution and values for", variables[v]),
+                y = "Density",
+                x = "Value of parameter",
+            )
+        
+    }
+    
+    return(list_graphs)
 }

@@ -16,11 +16,12 @@ SHOW_WEATHER_STATIONS <- FALSE      # Location of meteo-france stations
 SHOW_WEATHER_INTERPOLATION <- FALSE # Temperatures interpolated from meteo-france
 SHOW_CHELSA_ST <- TRUE              # Surface temperatures from CHESLA model
 SHOW_CORINE_RASTER <- TRUE          # Land Cover
-SHOW_MODEL_DASHBOARD <- FALSE       # TODO
+SHOW_MY_CLC_RASTER <- TRUE          # Land Cover
 
 # plots with options
 SHOW_RESEARCH_NETWORK <- TRUE
-color_column <- "network"
+COLOR_RESEARCH_BY <- "network"
+SHOW_ENI_NETWORK <- TRUE
 
 
 ### DO NOT MODIFY
@@ -104,12 +105,30 @@ if (sys.nframe() == 0) {
             rescale_legend = c(1.5, 1)
         )
     }
+    # map of my CLC raster (simplified from base CLC)
+    if (SHOW_MY_CLC_RASTER){
+        corine_raster_path <- file.path(SIMULATION_PATH, paste0("CLC2018_WGS84_custom_france_res", RES_KM, "_simplified_custom.tif"))
+        g4.1 <- ggplot_categorical_raster_on_france_map(
+            base_map = empty_map_of_france,
+            raster = corine_raster_path,
+            layer_name = "land_cover"
+        )
+        
+        print(g4.1)
+        save_figure_harmonized(
+            g4.1,
+            file.path(FIGURES_PATH, paste0("CORINE_Land_Cover_2018", "_res", RES_KM, "_simplified_custom.pdf")),
+            rescale_legend = c(1.5, 1)
+        )
+    }
+
+
     # map of the research network
     if (SHOW_RESEARCH_NETWORK){
         g5 <- ggplot_categorical_df_on_france_map(
             base_map = empty_map_of_france,
             df = file.path(PROCESSED_DATA_PATH_CSV, "BIODICAPT_survey_data.csv"),
-            column = color_column,
+            column = COLOR_RESEARCH_BY,
             LON = "LON",
             LAT = "LAT"
         )
@@ -121,6 +140,20 @@ if (sys.nframe() == 0) {
             rescale_legend = c(1.5, 1)
         )
     }
-    
-    print("TODO : add next plots to save")
+    # map of the 500ENI network
+    if (SHOW_ENI_NETWORK){
+        g5.1 <- ggplot_categorical_df_on_france_map(
+            base_map = empty_map_of_france,
+            df = file.path(PROCESSED_DATA_PATH_CSV, "500ENI_survey_data.csv"),
+            LON = "X",
+            LAT = "Y"
+        )
+
+        print(g5.1)
+        save_figure_harmonized(
+            g5.1,
+            file.path(FIGURES_PATH, "500ENI_surveyed_locations.pdf"),
+            rescale_legend = c(1.5, 1)
+        )
+    }
 }

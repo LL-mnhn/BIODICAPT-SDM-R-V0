@@ -13,7 +13,7 @@ library(sf)
 
 ##### Parameters #####
 # DO NOT MODIFY
-# Extent of raster around France with some space around
+# Extent (in CRS 4326) of raster around France with some space around
 LON_MIN <- -5
 LON_MAX <- 9.55
 LAT_MIN <- 41.35
@@ -45,6 +45,7 @@ get_france_shapefile <- function(borders = "national"){
     return(france_sf)
 }
 
+
 #' Create a raster to serve as template in other functions
 #'
 #' The raster created is centered on France It is used by several 
@@ -69,6 +70,43 @@ get_france_raster_template <- function(res_km){
     return(template)
 }
 
+
+#' Blur the GPS coordinates stored in a dataframe
+#'
+#' Use this function when you need to anonymize your dataset
+#'
+#' @param df A dataframe with x_lon & y_lat columns
+#' @param x_lon A string, the name of the column in df that contains longitude coordinates
+#' @param y_lat A string, the name of the column in df that contains latitude coordinates
+#' @param res_km A numeric (int or float) that represents the average spatial resolution of the grid (each cell will be approx. \code{res}*\code{res} km)
+#' 
+#' @return A dataframe with x_lon and y_lat values blurred
+#'
+#' @export
+blur_coordinates <- function(df, x_lon, y_lat, res_km){
+    # Manual check of coordinate system (CRS 4326)
+    if ((min(df[x_lon]) < LON_MIN) || 
+        (max(df[x_lon]) > LON_MAX) || 
+        (min(df[y_lat]) < LAT_MIN) || 
+        (max(df[y_lat]) > LAT_MAX)) {   
+            stop("Wrong coordinate system. (buuuuuut... this function only conducts a very shallow test)")
+    }
+    
+    # Blurring depends on resolution
+    lat_mean <- (LAT_MIN + LAT_MAX) / 2
+    res_lat <- res_km / 111.0
+    res_lon <- res_km / (111.0 * cos(lat_mean * pi / 180))
+  
+    # Now, generate noise (dividing by 1.96 so that ~95% of the points stay within res_km of their original position)
+    lat_blur <- rnorm(nrow(df[y_lat]), mean = 0, sd = res_lat/1.96) 
+    lon_blur <- rnorm(nrow(df[x_lon]), mean = 0, sd = res_lon/1.96)
+  
+    # replace in data.table
+    df[y_lat] <- df[y_lat] + lat_blur
+    df[x_lon] <- df[x_lon] + lon_blur
+  
+    return(df)
+}
 
 #' Fetch and filter urls of meteo-france datasets available on data.gouv.fr
 #'
@@ -114,6 +152,7 @@ get_meteofr_urls <- function(){
     
     return(filtered_metropolitan_urls)
 }
+
 
 #' Import and concatenate meteo france dataset to a data.frame
 #'
@@ -181,6 +220,7 @@ load_url_2_df <- function(
     return(dplyr::bind_rows(list_dfs))
 }
 
+
 #' Turn monthly data from meteo-france to annual data
 #'
 #' Groups the dataframe of monthly collected temperature by meteo france into
@@ -213,6 +253,7 @@ select_year_round_obs <- function(df, mode = "average") {
     
     return(df_annual)
 }
+
 
 #' Create a raster from scattered data
 #'
@@ -290,6 +331,7 @@ interpolate_scattered_data <- function(
     return(interp_clipped)
 }
 
+
 #' A simple function to clip a raster using a shapefile
 #'
 #' @param raset A raster object.
@@ -308,6 +350,7 @@ clip_raster_from_shapefile <- function(raster, shapefile){
         stop("raster and shapefile have different CRS.")
     }
 }
+
 
 #' Load weather dataframe and pre-proccess it to a grid
 #'
@@ -339,6 +382,7 @@ scattered_points_2_grid_on_france <- function(
 
     return(final_raster)
 }
+
 
 #' Load weather dataframe and pre-proccess it to a grid
 #'
@@ -448,13 +492,15 @@ simplify_CLC <- function(
     clc_raster_aug <- terra::classify(clc_raster, reclass_matrix)
     
     # Assign new category labels
-    base::levels(clc_raster_aug) = data.frame(
+    levels(clc_raster_aug) <- data.frame(
         ID = seq_along(class_levels),
         LABEL = class_levels
     ) 
+
+    ### OK jusqu'ici : on a les categories, mais pas les couleurs.
     
-    # Re-assign original colors (using levels in a similar way)
-    # Compute color for each category
+    # Assign new colors (to replace default palette)
+    # Get mean of old categories
     color_table <- cat_table %>%
         dplyr::group_by(CUSTOM_CODE, CUSTOM_LABEL) %>%
         dplyr::summarise(
@@ -464,28 +510,21 @@ simplify_CLC <- function(
             .groups = "drop"
         ) %>%
         dplyr::arrange(CUSTOM_CODE)
-    
-    # Assign new layer in raster
+
     color_levels <- data.frame(
-        ID = color_table$CUSTOM_CODE, 
-        LABEL = color_table$CUSTOM_LABEL
-    )
-    base::levels(clc_raster_aug) <- color_levels    
-    
-    # Assign new (default) color table in raster
-    coltab <- data.frame(
-        value = color_table$CUSTOM_CODE,
+        value = color_table$CUSTOM_CODE, 
         col = rgb(
             color_table$Red, 
             color_table$Green, 
             color_table$Blue,
-            maxColorValue = 255)
+            maxColorValue = 1)
     )
-    
-    terra::coltab(clc_raster_aug) <- coltab 
+
+    terra::coltab(clc_raster_aug) <- color_levels 
     
     return(clc_raster_aug)
 }
+
 
 #' Group together the selected categories of a raster
 #'
@@ -504,8 +543,7 @@ group_CLC_categories <- function(
         raster,
         cats_2_group,
         new_group_name = "unmodelled",
-        new_group_color = "#000000"
-){
+        new_group_color = "#000000"){
     ### 1. Grouping labels to discard together
     # 1.1. get table of categories in raster
     cat_table <- terra::cats(raster)[[1]]
@@ -680,6 +718,7 @@ import_biodicapt_land_surveys <- function(xlsx_paths){
     print(names(final_df))
     return(final_df)
 }
+
 
 #' Compute a range and snap limits to closest multiples
 #'
